@@ -1,6 +1,7 @@
 const express = require("express");
-const cors = require("cors");
 require("dotenv").config();
+const cors = require("cors");
+const bodyParser = require("body-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 // ------------------
@@ -13,6 +14,7 @@ const app = express();
 // ------------------
 app.use(express.json());
 app.use(cors());
+app.use(bodyParser.json());
 
 // ---------------------------------------------------------------
 // MongoDB connection
@@ -44,6 +46,7 @@ async function run() {
     const userCollection = database.collection("users");
     const collegeCollection = database.collection("college");
     const admissionCollection = database.collection("admission");
+    const reviewCollection = database.collection("reviews");
 
     // ---------------------------------------------
     // POST USER
@@ -63,7 +66,15 @@ async function run() {
 
     app.post("/admission", async (req, res) => {
       const userAdmission = req.body;
-      const result = await userCollection.insertOne(userAdmission);
+      console.log(userAdmission);
+      const result = await admissionCollection.insertOne(userAdmission);
+      res.send(result);
+    });
+
+    app.post("/reviews", async (req, res) => {
+      const review = req.body;
+      console.log(review);
+      const result = await reviewCollection.insertOne(review);
       res.send(result);
     });
 
@@ -85,6 +96,11 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/reviews", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
+      res.send(result);
+    });
+
     app.get("/college/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -96,6 +112,53 @@ async function run() {
 
       res.send(result);
     });
+
+    app.get("/colleges", async (req, res) => {
+      const { search } = req.query;
+      console.log(req.query.search);
+      let query = {};
+
+      if (search) {
+        query = {
+          name: { $regex: new RegExp(search, "i") },
+        };
+      }
+
+      console.log(query);
+
+      const projection = { name: 1 }; // Project only the "name" field
+
+      const result = await collegeCollection.find(query, projection).toArray();
+      res.send(result);
+    });
+
+    // ----------------------------------------------------
+    // Patch Request
+    // ----------------------------------------------------
+
+    app.patch("/admission/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedData = req.body; // Get the updated data from the request body
+
+      console.log(updatedData);
+
+      try {
+        const result = await admissionCollection.updateOne(filter, {
+          $set: updatedData,
+        });
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating admission data:", error);
+        res.status(500).json({ message: "Failed to update admission data" });
+      }
+    });
+    // app.put("/admission/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const filter = { _id: new ObjectId(id) };
+    //   const result = await admissionCollection.updateOne(filter);
+    //   res.send(result);
+    // });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
